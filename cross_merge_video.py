@@ -187,17 +187,9 @@ def merge_boxes_across_patches(boxes, img_width, img_height, crop_width, crop_he
 
     return merged_boxes
 
-# 处理并预测单张图片
-def process_and_predict(image_path, output_dirs, class_names, confidence_threshold=0.0, crop_width=640, crop_height=640, iou_threshold=0.5, edge_threshold=20):
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"无法读取图片 {image_path}")
-        return
-
+# 处理并预测单帧图像
+def process_and_predict(image, class_names, confidence_threshold=0.0, crop_width=640, crop_height=640, iou_threshold=0.5, edge_threshold=20):
     img_height, img_width, _ = image.shape
-
-    image_name = os.path.basename(image_path).split('.')[0]
-
     cols = img_width // crop_width
     rows = img_height // crop_height
 
@@ -222,22 +214,11 @@ def process_and_predict(image_path, output_dirs, class_names, confidence_thresho
 
                     all_boxes.append([cls, x_center, y_center, width, height, confidence])
 
-    # 保存所有检测到的物体
-    image_all = image.copy()
-    draw_boxes_on_image(image_all, all_boxes, class_names)
-    cv2.imwrite(os.path.join(output_dirs['all_objects'], f"{image_name}.jpg"), image_all)
-
     # 根据置信度阈值筛选物体
     thresholded_boxes = [box for box in all_boxes if box[5] >= confidence_threshold]
 
-    # 保存经过阈值筛选的物体
-    image_thresholded = image.copy()
-    draw_boxes_on_image(image_thresholded, thresholded_boxes, class_names)
-    cv2.imwrite(os.path.join(output_dirs['thresholded_objects'], f"{image_name}.jpg"), image_thresholded)
-
     if not thresholded_boxes:
-        print(f"未检测到任何物体 {image_path}")
-        return
+        return image
 
     # 第一步：对每个类别分别进行 NMS，合并重叠的框（重复检测）
     nms_boxes = []
@@ -249,55 +230,50 @@ def process_and_predict(image_path, output_dirs, class_names, confidence_thresho
         indices = nms(boxes_tensor, scores_tensor, iou_threshold)
         nms_boxes.extend([cls_boxes[i] for i in indices])
 
-    # 保存经过 NMS 的物体
-    image_nms = image.copy()
-    draw_boxes_on_image(image_nms, nms_boxes, class_names)
-    cv2.imwrite(os.path.join(output_dirs['nms_objects'], f"{image_name}.jpg"), image_nms)
-
     # 第二步：合并跨越 patch 的同一物体的框
     merged_boxes = merge_boxes_across_patches(nms_boxes, img_width, img_height, crop_width, crop_height, edge_threshold)
 
-    # 保存合并后的物体
-    image_merged = image.copy()
-    draw_boxes_on_image(image_merged, merged_boxes, class_names)
-    cv2.imwrite(os.path.join(output_dirs['merged_objects'], f"{image_name}.jpg"), image_merged)
+    # 绘制检测框
+    image_with_boxes = image.copy()
+    draw_boxes_on_image(image_with_boxes, merged_boxes, class_names)
 
-    # 保存 YOLO 格式的标注
-    save_yolo_format(merged_boxes, image_name, output_dirs['labels'], img_width, img_height)
+    return image_with_boxes
 
-# 处理整个文件夹的函数
-def process_images(input_folder, output_root, class_names, confidence_threshold=0.0, iou_threshold=0.5, edge_threshold=20):
-    image_paths = [os.path.join(input_folder, file) for file in os.listdir(input_folder)
-                   if file.endswith(('.jpg', '.png', '.jpeg'))]
+# 处理视频的函数
+def process_video(input_video_path, output_video_path, class_names, confidence_threshold=0.0, iou_threshold=0.5, edge_threshold=20):
+    cap = cv2.VideoCapture(input_video_path)
+    if not cap.isOpened():
+        print(f"无法读取视频 {input_video_path}")
+        return
 
-    # 创建输出文件夹
-    output_dirs = {
-        'all_objects': os.path.join(output_root, 'all_objects'),
-        'thresholded_objects': os.path.join(output_root, 'thresholded_objects'),
-        'nms_objects': os.path.join(output_root, 'nms_objects'),
-        'merged_objects': os.path.join(output_root, 'merged_objects'),
-        'labels': os.path.join(output_root, 'labels')
-    }
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
-    for dir_path in output_dirs.values():
-        os.makedirs(dir_path, exist_ok=True)
+    # 创建视频写入对象
+    out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
-    with tqdm(total=len(image_paths), desc="Processing images", unit="image") as pbar:
-        for image_path in image_paths:
-            process_and_predict(image_path, output_dirs, class_names, confidence_threshold,
-                                iou_threshold=iou_threshold, edge_threshold=edge_threshold)
+    with tqdm(total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), desc="Processing video", unit="frame") as pbar:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # 处理单帧图像
+            processed_frame = process_and_predict(frame, class_names, confidence_threshold, iou_threshold=iou_threshold, edge_threshold=edge_threshold)
+
+            # 将处理后的帧写入输出视频
+            out.write(processed_frame)
+
             pbar.update(1)
 
-    # 复制 classes.txt 到 labels 文件夹
-    shutil.copy('classes.txt', output_dirs['labels'])
+    cap.release()
+    out.release()
+    print(f"视频处理完成，已保存到 {output_video_path}")
 
 # 加载模型
 model_path = 'weights/best.pt'
 model = YOLO(model_path)
-
-# 输入和输出路径
-input_folder = "D:\\Github\\CageYolo\\Test\\0811"
-output_root = "D:\\Github\\CageYolo\\Test\\predict0811"
 
 # 类别名称
 class_names = ['ship', 'aquaculture cage', 'buoy']  # 替换为您的类别名称列表
@@ -311,6 +287,10 @@ iou_threshold = 0.5  # 通常设置为 0.5
 # 边缘阈值（用于判断是否靠近 patch 边缘）
 edge_threshold = 5  # 根据实际情况调整
 
-# 处理图片
-process_images(input_folder, output_root, class_names, confidence_threshold=confidence_threshold,
-               iou_threshold=iou_threshold, edge_threshold=edge_threshold)
+# 输入和输出视频路径
+input_video_path = "D:\\Github\\CageYolo\\Test\\input_video.mp4"
+output_video_path = "D:\\Github\\CageYolo\\Test\\output_video.mp4"
+
+# 处理视频
+process_video(input_video_path, output_video_path, class_names, confidence_threshold=confidence_threshold,
+              iou_threshold=iou_threshold, edge_threshold=edge_threshold)
