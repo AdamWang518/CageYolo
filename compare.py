@@ -108,7 +108,7 @@ def process_images_with_patch_model(model, input_folder, output_root, class_name
 
 if __name__ == "__main__":
     patch_model = YOLO("weights/patch/best.pt")
-    full_model = YOLO("weights/full/best.pt")
+    full_model = YOLO("train4\\weights")
     input_folder = "D:/Github/RandomPick_v6_5_Combined/test/images"
     class_names = ['ship', 'aquaculture cage', 'buoy']
 
