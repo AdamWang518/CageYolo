@@ -1,8 +1,9 @@
 # YOLOv11 dataset YAML for custom dataset
 
 # 路徑
-train: RandomPick/RandomPick_v6/train  # 訓練數據集圖片的路徑
-val: RandomPick/RandomPick_v6/val      # 驗證數據集圖片的路徑
+train: ../RandomPick_v6_5_Combined/train  # 訓練數據集圖片的路徑
+val: ../RandomPick_v6_5_Combined/test      # 驗證數據集圖片的路徑
+
 
 # 類別
 nc: 3  # 類別數量
