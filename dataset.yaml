@@ -2,8 +2,8 @@
 
 # 路徑
 
-train: ../RandomPick_v6_5_Combined/train/images  # 訓練數據集圖片的路徑
-val: ../RandomPick_v6_5_Combined/test/images      # 驗證數據集圖片的路徑
+train: /data/RandomPick_v6_5_Combined/train/images  # 訓練數據集圖片的路徑
+val: /data/RandomPick_v6_5_Combined/test/images      # 驗證數據集圖片的路徑
 
 
 # 類別
