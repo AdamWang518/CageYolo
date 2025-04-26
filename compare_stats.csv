@@ -1,0 +1,4 @@
+Class,GT,Patch TP,Patch Recall,Full TP,Full Recall
+ship,1880,1509,0.803,333,0.177
+aquaculture cage,9365,7410,0.791,7302,0.780
+buoy,209790,195906,0.934,54253,0.259

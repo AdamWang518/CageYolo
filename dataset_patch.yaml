@@ -1,0 +1,14 @@
+# YOLOv11 dataset YAML for custom dataset
+
+# 路徑
+
+train: /data/RandomPick_v6_6_Patched/train/images  # 訓練數據集圖片的路徑
+val: /data/RandomPick_v6_6_Patched/test/images      # 驗證數據集圖片的路徑
+
+
+# 類別
+nc: 3  # 類別數量
+names:
+  - ship              # 第一類別名稱
+  - aquaculture cage  # 第二類別名稱
+  - buoy              # 第三類別名稱

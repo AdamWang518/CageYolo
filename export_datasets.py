@@ -2,15 +2,23 @@ import os
 import cv2
 import random
 import shutil
-from tqdm import tqdm  # ✅ 加入進度條
+from tqdm.auto import tqdm
 
-def split_dataset(image_dir, split_ratio=0.8, seed=42):
+# ─────────────────────────────── 資料集切分 ───────────────────────────────
+def split_dataset_train_val(image_dir, train_ratio=0.5, seed=42):
     random.seed(seed)
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg', '.png'))]
     random.shuffle(image_files)
-    split_idx = int(len(image_files) * split_ratio)
-    return image_files[:split_idx], image_files[split_idx:]
 
+    n_total = len(image_files)
+    n_train = int(n_total * train_ratio)
+
+    train_files = image_files[:n_train]
+    val_files = image_files[n_train:]
+
+    return train_files, val_files
+
+# ─────────────────────────────── 檔案複製 ───────────────────────────────
 def copy_files(file_list, image_dir, label_dir, out_img_dir, out_lbl_dir, desc="Copying"):
     os.makedirs(out_img_dir, exist_ok=True)
     os.makedirs(out_lbl_dir, exist_ok=True)
@@ -22,6 +30,7 @@ def copy_files(file_list, image_dir, label_dir, out_img_dir, out_lbl_dir, desc="
         if os.path.exists(lbl_src):
             shutil.copy(lbl_src, os.path.join(out_lbl_dir, os.path.basename(lbl_src)))
 
+# ─────────────────────────────── 單張圖片切 patch ───────────────────────────────
 def process_images_and_labels_single(img, image_file, label_path, output_dir, img_width, img_height, crop_width, crop_height):
     patch_all_images_dir = os.path.join(output_dir, "images")
     patch_all_labels_dir = os.path.join(output_dir, "labels")
@@ -78,40 +87,52 @@ def process_images_and_labels_single(img, image_file, label_path, output_dir, im
                         new_bbox_height /= crop_height
                         new_file.write(f"{class_id} {new_x_center} {new_y_center} {new_bbox_width} {new_bbox_height}\n")
 
-def export_dual_datasets(image_dir, label_dir, full_output_dir, patch_output_dir,
-                         img_width, img_height, crop_width, crop_height):
-    train_files, test_files = split_dataset(image_dir)
+# ─────────────────────────────── 主函式 ───────────────────────────────
+def export_train_val_dataset(image_dir, label_dir, full_output_dir, patch_output_dir,
+                             img_width, img_height, crop_width, crop_height):
 
-    # 輸出原圖資料集（full）
+    train_files, val_files = split_dataset_train_val(image_dir)
+
+    # 複製原圖版
     copy_files(train_files, image_dir, label_dir,
                os.path.join(full_output_dir, "train/images"),
                os.path.join(full_output_dir, "train/labels"),
                desc="📦 複製原圖訓練集")
-    
-    copy_files(test_files, image_dir, label_dir,
-               os.path.join(full_output_dir, "test/images"),
-               os.path.join(full_output_dir, "test/labels"),
-               desc="📦 複製原圖測試集")
 
-    # 輸出 patch 資料集（patch）
-    for split_name, files in [("train", train_files), ("test", test_files)]:
-        tqdm_iter = tqdm(files, desc=f"🔧 切 patch（{split_name}）", ncols=100)
+    copy_files(val_files, image_dir, label_dir,
+               os.path.join(full_output_dir, "val/images"),
+               os.path.join(full_output_dir, "val/labels"),
+               desc="📦 複製原圖驗證集")
+
+    # 複製 patch 版
+    for split_name in ["train", "val"]:
+        split_dir = os.path.join(full_output_dir, split_name)
+        img_split_dir = os.path.join(split_dir, "images")
+        lbl_split_dir = os.path.join(split_dir, "labels")
+
+        output_patch_split = os.path.join(patch_output_dir, split_name)
+        os.makedirs(output_patch_split, exist_ok=True)
+
+        img_list = [f for f in os.listdir(img_split_dir) if f.lower().endswith(('.jpg', '.png'))]
+        tqdm_iter = tqdm(img_list, desc=f"🔧 切 patch（{split_name}）", ncols=100)
         for fname in tqdm_iter:
-            img_path = os.path.join(image_dir, fname)
-            lbl_path = os.path.join(label_dir, os.path.splitext(fname)[0] + '.txt')
+            img_path = os.path.join(img_split_dir, fname)
+            lbl_path = os.path.join(lbl_split_dir, os.path.splitext(fname)[0] + '.txt')
             img = cv2.imread(img_path)
             if img is not None:
                 process_images_and_labels_single(
                     img, fname, lbl_path,
-                    os.path.join(patch_output_dir, split_name),
+                    output_patch_split,
                     img_width, img_height, crop_width, crop_height
                 )
 
-# 使用方式（請依實際修改）
-image_dir = 'D:\\Github\\RandomPick_v6_Combined\\images'
-label_dir = 'D:\\Github\\RandomPick_v6_Combined\\labels'
-full_output_dir = 'D:\\Github\\RandomPick_v6_6_Combined'
-patch_output_dir = 'D:\\Github\\RandomPick_v6_6_Patched'
+# ─────────────────────────────── 設定 ───────────────────────────────
+if __name__ == "__main__":
+    image_dir = 'D:\\Github\\RandomPick_v6_New_Combined\\images'
+    label_dir = 'D:\\Github\\RandomPick_v6_New_Combined\\labels'
+    full_output_dir = 'D:\\Github\\RandomPick_v6_6_Full'
+    patch_output_dir = 'D:\\Github\\RandomPick_v6_6_Patched'
 
-export_dual_datasets(image_dir, label_dir, full_output_dir, patch_output_dir,
-                     2560, 1920, 640, 640)
+    export_train_val_dataset(image_dir, label_dir, full_output_dir, patch_output_dir,
+                              img_width=2560, img_height=1920,
+                              crop_width=640, crop_height=640)
