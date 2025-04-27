@@ -5,7 +5,7 @@ import shutil
 from tqdm.auto import tqdm
 
 # ─────────────────────────────── 資料集切分 ───────────────────────────────
-def split_dataset_train_val(image_dir, train_ratio=0.5, seed=42):
+def split_dataset_train_val(image_dir, train_ratio=0.8, seed=42):
     random.seed(seed)
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg', '.png'))]
     random.shuffle(image_files)

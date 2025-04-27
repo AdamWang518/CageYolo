@@ -44,3 +44,5 @@
 - /runs : 最後一次訓練(train6)是 /RandomPick/RandomPick_v6 包含船、箱網、浮標的訓練
 
 - main.ipynb : 不想重複敲指令用而已， 切patch、 訓練、.pt轉.engine、預測
+
+-5:5，出現了欠擬和，建議還是8:2

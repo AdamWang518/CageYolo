@@ -5,3 +5,5 @@
 *.engine
 *.onnx
 /train4
+/runs_patch
+/runs_full
